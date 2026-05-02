@@ -26,8 +26,5 @@
     "@swc/helpers": "^0.5.18",
     "serve": "^14.2.5"
   },
-  "overrides": {
-    "@types/react": "^19.2.2"
-  },
   "packageManager": "bun@1.3.2"
 }
