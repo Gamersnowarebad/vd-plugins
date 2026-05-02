@@ -1,4 +1,5 @@
-# [kmmiio99o's](https://kmmiio99o.dev) Plugins
+# UNOFFICIAL FORK, I HAVE NO IDEA WHAT I AM DOING, IGNORE.
+[kmmiio99o's](https://kmmiio99o.dev) Plugins
 
 A collection of plugins for [**Kettu**](https://codeberg.org/cocobo1/Kettu), [**Revenge**](https://github.com/revenge-mod/revenge-bundle) and [**ShiggyCord**](https://shiggycord.dev) discord mobile clients
 
