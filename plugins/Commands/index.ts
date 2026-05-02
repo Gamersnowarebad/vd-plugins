@@ -1,137 +1,166 @@
-import { findByProps } from "@vendetta/metro";
-import { showToast } from "@vendetta/ui/toasts";
-import { getAssetIDByName } from "@vendetta/ui/assets";
+import { registerCommand } from "@vendetta/commands";
+import { storage } from "@vendetta/plugin";
+import {
+  catFactCommand,
+  dogFactCommand,
+  uselessFactCommand,
+} from "./src/commands/facts";
+import { pluginListCommand, themeListCommand } from "./src/commands/lists";
+import { petPetCommand } from "./src/commands/petpet";
+import { konoSelfCommand, konoSendCommand } from "./src/commands/konochan";
+import { firstMessageCommand } from "./src/commands/firstmessage";
+import { sysinfoCommand } from "./src/commands/sysinfo";
+import {
+  spotifyTrackCommand,
+  spotifyAlbumCommand,
+  spotifyArtistsCommand,
+  spotifyCoverCommand,
+} from "./src/commands/spotify";
+import { garyCommand } from "./src/commands/gary";
+import { lovefemboysCommand } from "./src/commands/lovefemboys";
+import { ipCommand } from "./src/commands/ip";
+import { nekoslifeCommand } from "./src/commands/nekoslife";
+import {
+  friendInviteCreateCommand,
+  friendInviteViewCommand,
+  friendInviteRevokeCommand,
+} from "./src/commands/friendinvites";
+import settings from "./settings/settings";
+import patchSidebar from "./sidebar";
 
-const MessageActions = findByProps("sendMessage");
-const messageUtil = findByProps("sendBotMessage", "sendMessage", "receiveMessage");
-
-interface NekosLifeResult {
-    url: string;
+if (!storage.factSettings) {
+  storage.factSettings = {
+    sendAsReply: true,
+    includeCitation: false,
+  };
+}
+if (!storage.listSettings) {
+  storage.listSettings = {
+    pluginListAlwaysDetailed: false,
+    themeListAlwaysDetailed: false,
+  };
+}
+if (!storage.garySettings) {
+  storage.garySettings = {
+    imageSource: "gary",
+  };
+}
+if (!storage.enabledCommands) {
+  storage.enabledCommands = {
+    catfact: true,
+    dogfact: true,
+    useless: true,
+    petpet: true,
+    pluginList: true,
+    themeList: true,
+    konoself: true,
+    konosend: true,
+    firstmessage: true,
+    sysinfo: true,
+    spotifyTrack: true,
+    spotifyAlbum: true,
+    spotifyArtists: true,
+    spotifyCover: true,
+    gary: true,
+    ip: true,
+    lovefemboys: false,
+    nekoslife: false,
+    friendInviteCreate: true,
+    friendInviteView: true,
+    friendInviteRevoke: true,
+  };
+}
+if (!storage.hiddenSettings) {
+  storage.hiddenSettings = {
+    enabled: false,
+    visible: false,
+    konochanBypassNsfw: false,
+  };
+}
+// sidebar enabled setting
+if (storage.sidebarEnabled === undefined) {
+  storage.sidebarEnabled = true;
 }
 
-// Valid SFW categories
-const validSfwCategories = [
-    "avatar", "classic", "cuddle", "fox_girl", "gecg", "holo",
-    "kemonomimi", "kiss", "neko", "ngif", "smug", "spank",
-    "tickle", "waifu", "wallpaper", "woof"
-];
+const commandMap = {
+  catfact: catFactCommand,
+  dogfact: dogFactCommand,
+  useless: uselessFactCommand,
+  petpet: petPetCommand,
+  pluginList: pluginListCommand,
+  themeList: themeListCommand,
+  konoself: konoSelfCommand,
+  konosend: konoSendCommand,
+  firstmessage: firstMessageCommand,
+  sysinfo: sysinfoCommand,
+  spotifyTrack: spotifyTrackCommand,
+  spotifyAlbum: spotifyAlbumCommand,
+  spotifyArtists: spotifyArtistsCommand,
+  spotifyCover: spotifyCoverCommand,
+  gary: garyCommand,
+  ip: ipCommand,
+  lovefemboys: lovefemboysCommand,
+  nekoslife: nekoslifeCommand,
+  friendInviteCreate: friendInviteCreateCommand,
+  friendInviteView: friendInviteViewCommand,
+  friendInviteRevoke: friendInviteRevokeCommand,
+};
 
-async function fetchNekosLifeImages(category: string, count: number): Promise<string[]> {
-    const urls: string[] = [];
+let commands: Array<() => void> = [];
+let sidebarUnpatch: (() => void) | undefined;
 
-    for (let i = 0; i < count; i++) {
-        try {
-            if (i > 0) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+export default {
+  onLoad: () => {
+    console.log("[Commands Plugin] Loading...");
 
-            const response = await fetch(`https://nekos.life/api/v2/img/${category}`);
-            if (!response.ok) {
-                console.error(`[NekosLife] API request failed: ${response.status}`);
-                continue;
-            }
-
-            const data: NekosLifeResult = await response.json();
-            if (data.url) {
-                urls.push(data.url);
-            }
-        } catch (error) {
-            console.error(`[NekosLife] Error fetching image ${i + 1}:`, error);
-        }
+    // Patch sidebar if enabled
+    if (storage.sidebarEnabled !== false) {
+      try {
+        sidebarUnpatch = patchSidebar();
+        console.log("[Commands Plugin] Sidebar patched successfully");
+      } catch (error) {
+        console.error("[Commands Plugin] Failed to patch sidebar:", error);
+      }
     }
 
-    return urls;
-}
-
-export const nekoslifeCommand = {
-    name: "nekoslife",
-    displayName: "nekoslife",
-    description: "Get SFW images/gifs from nekos.life",
-    displayDescription: "Get SFW images/gifs from nekos.life",
-    options: [
-        {
-            name: "category",
-            displayName: "category",
-            description: "Choose a category",
-            displayDescription: "Choose a category",
-            type: 3, // String
-            required: true,
-            // This creates the dropdown menu
-            choices: validSfwCategories.map(cat => ({
-                name: cat.charAt(0).toUpperCase() + cat.slice(1).replace("_", " "),
-                displayName: cat.charAt(0).toUpperCase() + cat.slice(1).replace("_", " "),
-                value: cat
-            }))
-        },
-        {
-            name: "limit",
-            displayName: "limit",
-            description: "Number of images (1-5, default: 1)",
-            displayDescription: "Number of images (1-5, default: 1)",
-            type: 4, // Integer
-            required: false,
-        },
-        {
-            name: "send",
-            displayName: "send",
-            description: "Send to chat",
-            displayDescription: "Send to chat",
-            type: 5, // Boolean
-            required: false,
-        },
-        {
-            name: "ephemeral",
-            displayName: "ephemeral",
-            description: "Send as ephemeral message (only you can see)",
-            displayDescription: "Send as ephemeral message (only you can see)",
-            type: 5, // Boolean
-            required: false,
-        }
-    ],
-    execute: async (args: any, ctx: any) => {
+    // Register commands
+    for (const [key, command] of Object.entries(commandMap)) {
+      if (storage.enabledCommands[key]) {
         try {
-            const category = args.find((arg: any) => arg.name === "category")?.value;
-            const limitInput = args.find((arg: any) => arg.name === "limit")?.value;
-            const shouldSend = args.find((arg: any) => arg.name === "send")?.value || false;
-            const isEphemeral = args.find((arg: any) => arg.name === "ephemeral")?.value || false;
-
-            if (!category) return; // Dropdown ensures we get a valid value
-
-            let limit = 1;
-            if (limitInput !== undefined) {
-                limit = Math.max(1, Math.min(5, parseInt(String(limitInput)) || 1));
-            }
-
-            if (!isEphemeral) {
-                showToast(`Fetching ${limit} ${category} image(s)...`, getAssetIDByName("DownloadIcon"));
-            }
-
-            const urls = await fetchNekosLifeImages(category, limit);
-
-            if (urls.length === 0) {
-                const errorMsg = "❌ Failed to fetch images.";
-                if (isEphemeral) return { type: 4, data: { content: errorMsg, flags: 64 } };
-                showToast(errorMsg, getAssetIDByName("CircleXIcon"));
-                return null;
-            }
-
-            const content = urls.join("\n");
-
-            if (isEphemeral) {
-                return { type: 4, data: { content, flags: 64 } };
-            } else if (shouldSend) {
-                MessageActions.sendMessage(ctx.channel.id, { content }, void 0, { nonce: Date.now().toString() });
-                return null;
-            } else {
-                messageUtil.sendBotMessage(ctx.channel.id, content);
-                return null;
-            }
+          commands.push(registerCommand(command as any));
+          console.log(`[Commands Plugin] Registered command: ${key}`);
         } catch (error) {
-            console.error("[NekosLife] Command error:", error);
-            return null;
+          console.error(
+            `[Commands Plugin] Failed to register command ${key}:`,
+            error,
+          );
         }
-    },
-    applicationId: "-1",
-    inputType: 1,
-    type: 1,
+      }
+    }
+  },
+  onUnload: () => {
+    console.log("[Commands Plugin] Unloading...");
+
+    // Unregister commands
+    commands.forEach((unregister) => {
+      try {
+        unregister();
+      } catch (error) {
+        // Ignore errors during cleanup
+      }
+    });
+    commands = [];
+
+    // Unpatch sidebar
+    if (sidebarUnpatch) {
+      try {
+        sidebarUnpatch();
+        sidebarUnpatch = undefined;
+        console.log("[Commands Plugin] Sidebar unpatched");
+      } catch (error) {
+        console.error("[Commands Plugin] Failed to unpatch sidebar:", error);
+      }
+    }
+  },
+  settings,
 };
